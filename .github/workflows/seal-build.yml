@@ -1,0 +1,58 @@
+name: seal-build
+
+# Build-and-pack only: the jQuery test suite runs on Travis (.travis.yml).
+on:
+  workflow_dispatch: {}
+
+env:
+  # Resolve devDependencies as they were at the 1.11.1 release (2014-05-01).
+  NPM_CONFIG_REGISTRY: https://:2014-05-01T18%3A05%3A32.863000Z@time-machines-npm.sealsecurity.io/
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '0.10.48'
+      - name: Install faketime
+        run: sudo apt-get update && sudo apt-get install -y faketime
+      - name: Install dependencies
+        run: |
+          node --version
+          npm --version
+          npm install
+          # build/release.js (CDN copies) declares these as its own dependencies
+          npm install shelljs@0.2.6
+      - name: Build (grunt)
+        # dist/jquery.js embeds the build date and dist/jquery.min.js the build
+        # year; pin the clock to the release build time so they match.
+        env:
+          TZ: UTC
+        run: faketime '2014-05-01 17:42:00' ./node_modules/.bin/grunt
+      - name: Generate CDN copies (build/release.js generateArtifacts)
+        run: |
+          node -e '
+            var Release = {
+              newVersion: "1.11.1",
+              preRelease: false,
+              complete: function() {},
+              exec: function() {},
+              define: function( opts ) {
+                opts.generateArtifacts(function( files ) {
+                  console.log( "release artifacts: " + files.join( ", " ) );
+                });
+              }
+            };
+            require( "./build/release" )( Release );
+          '
+          ls -la dist dist/cdn
+      - name: Pack
+        run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jquery-npm-package
+          path: jquery-*.tgz
+          if-no-files-found: error

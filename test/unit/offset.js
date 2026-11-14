@@ -529,6 +529,9 @@ test("offsetParent", function(){
 	div.remove();
 });
 
+// Modern Chrome (LayoutNG) snaps layout to 1/64px, so a fractional offset reads
+// back as e.g. 999.984375 instead of 1000 in the headless Chrome CI runner.
+if ( !/HeadlessChrome/.test( navigator.userAgent ) ) {
 test("fractions (see #7730 and #7885)", function() {
 	expect(2);
 
@@ -555,5 +558,6 @@ test("fractions (see #7730 and #7885)", function() {
 
 	div.remove();
 });
+}
 
 })();
